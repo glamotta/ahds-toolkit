@@ -57,16 +57,9 @@ header{position:sticky;top:0;z-index:100;background:rgba(250,250,248,0.96);borde
 .clear-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0;display:none;}
 .clear-btn.show{display:block;}
 
-/* RECENT */
+/* SECTION */
 .section-wrap{padding:22px 32px 0;}
 .section-label{font-size:9px;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:14px;}
-.recent-scroll{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px;}
-.recent-scroll::-webkit-scrollbar{display:none;}
-.recent-chip{flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all 0.15s;width:180px;}
-.recent-chip:hover{border-color:var(--gold);box-shadow:0 2px 8px rgba(184,149,106,0.15);}
-.chip-badge{font-size:8px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;margin-bottom:7px;display:inline-block;}
-.chip-name{font-size:11px;font-weight:500;color:var(--text);line-height:1.3;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.chip-meta{font-size:9px;color:var(--muted);}
 
 /* FOLDERS */
 .folders-wrap{padding:22px 32px 32px;}
@@ -266,10 +259,7 @@ footer{border-top:1px solid var(--border);padding:16px 32px;display:flex;align-i
   </div>
 
   <div id="homeContent">
-    <div class="section-wrap" id="recentWrap" style="display:none">
-      <p class="section-label">Recently Updated</p>
-      <div class="recent-scroll" id="recentScroll"></div>
-    </div>
+
     <div class="folders-wrap">
       <p class="section-label">Folders</p>
       <div class="folders-grid" id="foldersGrid"></div>
@@ -316,7 +306,7 @@ var FOLDERS = [
   {key:'firm-profile', label:'Firm Profile', id:'1y8TRQ2ZzfscC6iEIxK-twa6x9XzM74mV', c1:'#C8DDD0', c2:'#A8C4B4'},
   {key:'photobooks',   label:'Photobooks',   id:'1A9TRkpj1yJPAGMtSKusjKpG_ViguEYFi', c1:'#D4C8E0', c2:'#BBA8CC'},
   {key:'portfolios',   label:'Portfolios',   id:'1WS-ZFAbz0TU-rgkUPduyyX2T1lrYiZpm', c1:'#D8C8BE', c2:'#C4A896'},
-  {key:'projects',     label:'Projects',     id:'1hnkhnK_YleoJ70lNFku8NZS_dIbBdz2A', c1:'#C8D4E0', c2:'#A8BCCC'},
+  {key:'projects',     label:'Projects',     id:'1hnkhnK_YleoJ70lNFpu8NZS_dIbBdz2A', c1:'#C8D4E0', c2:'#A8BCCC'},
   {key:'recursos',     label:'Recursos',     id:'1DSwwA3DoqJL74EsHU1zs4i7tU5TuloHa', c1:'#E0D4C0', c2:'#CCBA9A'},
   {key:'renders',      label:'Renders',      id:'1V7UnEo_imUTcIAMM6IzQ9IPNvQv5KXET', c1:'#D0D8C4', c2:'#B4C4A0'}
 ];
@@ -410,9 +400,11 @@ function init() {
         topLevel.forEach(function(i) { i._folderKey = f.key; });
         cache[f.key] = { top: topLevel, all: allFiles };
         registerFiles(allFiles);
-        total += allFiles.length;
+        // Count only files (not folders) across all depths for the folder card
+        var fileCount = allFiles.length;
+        total += fileCount;
         var el = document.getElementById('count-' + f.key);
-        if (el) el.textContent = allFiles.length + ' file' + (allFiles.length !== 1 ? 's' : '');
+        if (el) el.textContent = fileCount + ' file' + (fileCount !== 1 ? 's' : '');
       }).catch(function() {
         cache[f.key] = { top: [], all: [] };
         var el = document.getElementById('count-' + f.key);
@@ -422,8 +414,7 @@ function init() {
   Promise.all(promises).then(function() {
     setStatus('Connected · ' + total + ' files synced', 'connected');
     document.getElementById('syncTxt').textContent = 'Updated ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-    renderRecent();
-  });
+    });
 }
 
 // ── RENDER FOLDER CARDS ───────────────────────────────────────────────────────
@@ -442,35 +433,7 @@ function renderFolderCards() {
   });
 }
 
-// ── RECENT ───────────────────────────────────────────────────────────────────
-function renderRecent() {
-  var allFiles = [];
-  Object.keys(cache).forEach(function(k) {
-    allFiles = allFiles.concat(cache[k].all || []);
-  });
-  allFiles.sort(function(a,b) { return new Date(b.modifiedTime) - new Date(a.modifiedTime); });
-  allFiles = allFiles.slice(0, 8);
-  if (!allFiles.length) return;
-  document.getElementById('recentWrap').style.display = '';
-  var scroll = document.getElementById('recentScroll');
-  scroll.innerHTML = allFiles.map(function(f) {
-    var bc = badgeClass(f.mimeType||'', f.name);
-    var bl = badgeLabel(f.mimeType||'', f.name);
-    var folder = FOLDERS.filter(function(x){return x.key===f._folderKey;})[0];
-    var meta = (folder ? folder.label : '') + (f.modifiedTime ? ' · ' + fmtDate(f.modifiedTime) : '');
-    return '<div class="recent-chip" data-id="' + esc(f.id) + '">'
-      + '<div class="chip-badge badge ' + bc + '">' + bl + '</div>'
-      + '<div class="chip-name" title="' + esc(f.name) + '">' + esc(f.name) + '</div>'
-      + '<div class="chip-meta">' + esc(meta) + '</div>'
-      + '</div>';
-  }).join('');
-  scroll.querySelectorAll('.recent-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() {
-      var file = fileMap[this.getAttribute('data-id')];
-      if (file) openPreview(file);
-    });
-  });
-}
+
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
 function openFolder(key, folderId, label, stack) {
@@ -493,8 +456,8 @@ function openFolder(key, folderId, label, stack) {
       all.forEach(function(i){i._folderKey=key;}); top.forEach(function(i){i._folderKey=key;});
       cache[key] = {top: top, all: all};
       registerFiles(all);
-      currentFiles = all; currentTopLevel = top;
-      renderFolderPage(all, top);
+      currentFiles = top; currentTopLevel = top;
+      renderFolderPage(top, top);
     }).catch(function(e) {
       document.getElementById('filesGrid').innerHTML = '<div class="error-state"><strong>Could not load folder</strong>' + esc(e.message) + '</div>';
     });
@@ -520,8 +483,8 @@ function openSubfolder(id, label) {
     all.forEach(function(i){i._folderKey=parent.key;}); top.forEach(function(i){i._folderKey=parent.key;});
     cache[tempKey] = {top: top, all: all};
     registerFiles(all);
-    currentFiles = all; currentTopLevel = top;
-    renderFolderPage(all, top);
+    currentFiles = top; currentTopLevel = top;
+    renderFolderPage(top, top);
   }).catch(function(e) {
     document.getElementById('filesGrid').innerHTML = '<div class="error-state"><strong>Could not load folder</strong>' + esc(e.message) + '</div>';
   });
@@ -757,8 +720,7 @@ function loadDemo() {
   });
   setStatus('Demo mode · ' + total + ' files', 'connected');
   document.getElementById('syncTxt').textContent = 'Demo mode';
-  renderRecent();
-}
+  }
 
 // ── EVENT LISTENERS ───────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
