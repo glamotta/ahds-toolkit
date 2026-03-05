@@ -138,6 +138,17 @@ header{position:sticky;top:0;z-index:100;background:rgba(250,250,248,0.97);borde
 .pv-btn-gold{background:var(--gold);color:#fff;}
 .pv-btn-grey{background:var(--surface2);color:var(--text-mid);border:1px solid var(--border);}
 .preview-frame{flex:1;width:100%;border:none;background:#525659;}
+.preview-fallback{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:var(--bg);padding:40px 20px;text-align:center;}
+.preview-fallback.show{display:flex;}
+.preview-fallback-icon{font-size:48px;opacity:0.3;}
+.preview-fallback-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;color:var(--text);}
+.preview-fallback-sub{font-size:12px;color:var(--muted);line-height:1.8;max-width:360px;}
+.preview-fallback-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:8px;}
+.pf-btn{padding:12px 24px;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;text-decoration:none;border-radius:8px;border:none;cursor:pointer;transition:all 0.15s;}
+.pf-btn-gold{background:var(--gold);color:#fff;}
+.pf-btn-gold:hover{background:var(--gold-dark);}
+.pf-btn-grey{background:var(--surface2);color:var(--text-mid);border:1px solid var(--border2);}
+.pf-btn-grey:hover{background:var(--border);}
 
 .overlay{position:fixed;inset:0;background:rgba(28,26,24,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);}
 .overlay.hidden{display:none;}
@@ -201,6 +212,15 @@ footer{border-top:1px solid var(--border);padding:16px 32px;display:flex;align-i
     <button class="preview-close" id="previewCloseBtn">✕</button>
   </div>
   <iframe class="preview-frame" id="previewFrame" allowfullscreen></iframe>
+  <div class="preview-fallback" id="previewFallback">
+    <div class="preview-fallback-icon">📄</div>
+    <div class="preview-fallback-title">File too large to preview</div>
+    <div class="preview-fallback-sub">This file exceeds Google Drive’s preview limit. You can open it directly in Google Drive or download it to your device.</div>
+    <div class="preview-fallback-btns">
+      <a class="pf-btn pf-btn-gold" id="fallbackOpenBtn" href="#" target="_blank" rel="noopener">↗ Open in Google Drive</a>
+      <a class="pf-btn pf-btn-grey" id="fallbackDlBtn" href="#" target="_blank" rel="noopener">↓ Download File</a>
+    </div>
+  </div>
 </div>
 
 <!-- HEADER -->
@@ -665,16 +685,62 @@ function renderSearchResults(files){
 
 // ── PREVIEW ───────────────────────────────────────────────────────────────────
 function openPreview(file){
+  var viewUrl=file.webViewLink||'https://drive.google.com/file/d/'+file.id+'/view';
+  var dlUrl=file.webContentLink||'https://drive.google.com/uc?export=download&id='+file.id;
+  var frame=document.getElementById('previewFrame');
+  var fallback=document.getElementById('previewFallback');
+
+  // Reset state
+  frame.style.display='block';
+  fallback.classList.remove('show');
+  frame.src='';
+
   document.getElementById('previewName').textContent=file.name;
-  document.getElementById('previewFrame').src='https://drive.google.com/file/d/'+file.id+'/preview';
-  document.getElementById('previewOpenBtn').href=file.webViewLink||'https://drive.google.com/file/d/'+file.id+'/view';
-  document.getElementById('previewDlBtn').href=file.webContentLink||'https://drive.google.com/uc?export=download&id='+file.id;
+  document.getElementById('previewOpenBtn').href=viewUrl;
+  document.getElementById('previewDlBtn').href=dlUrl;
+  document.getElementById('fallbackOpenBtn').href=viewUrl;
+  document.getElementById('fallbackDlBtn').href=dlUrl;
   document.getElementById('previewOverlay').classList.add('show');
   document.body.style.overflow='hidden';
+
+  // Detect when iframe fails to load (too large or blocked)
+  var timeout=setTimeout(function(){
+    // If after 12 seconds the frame hasn't loaded meaningful content, show fallback
+    showFallback(frame,fallback);
+  },12000);
+
+  frame.onload=function(){
+    clearTimeout(timeout);
+    // Try to detect Google's "too large" error page via URL
+    try {
+      var src=frame.src||'';
+      if(src.indexOf('accounts.google.com')>-1||src.indexOf('error')>-1){
+        showFallback(frame,fallback);
+      }
+    } catch(e){ /* cross-origin, assume ok */ }
+  };
+
+  frame.onerror=function(){
+    clearTimeout(timeout);
+    showFallback(frame,fallback);
+  };
+
+  // Set src after attaching listeners
+  frame.src='https://drive.google.com/file/d/'+file.id+'/preview';
+}
+
+function showFallback(frame,fallback){
+  frame.style.display='none';
+  frame.src='';
+  fallback.classList.add('show');
 }
 function closePreview(){
   document.getElementById('previewOverlay').classList.remove('show');
-  document.getElementById('previewFrame').src='';
+  var frame=document.getElementById('previewFrame');
+  var fallback=document.getElementById('previewFallback');
+  frame.src='';
+  frame.style.display='block';
+  fallback.classList.remove('show');
   document.body.style.overflow='';
 }
 
